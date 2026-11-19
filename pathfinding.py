@@ -1,4 +1,7 @@
-from graph import graph
+import json
+
+with open("graphs.json", "r") as file:
+    graph = json.load(file)
 
 def bfs(start, goal):
     visited = [start]
