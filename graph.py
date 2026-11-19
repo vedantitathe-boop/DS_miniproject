@@ -1,4 +1,11 @@
-graph = {
+"""Weighted, undirected Mumbai junction graph.
+
+The adjacency list is written explicitly here so it is easy to see and edit.
+Each key is a junction; each nested key is a directly connected junction;
+the number is the road distance in kilometres.
+"""
+
+ADJACENCY_LIST = {
     "KASARA": {
         "KALYAN": 71,
     },
@@ -100,3 +107,4 @@ graph = {
         "BANDRA": 6,
     },
 }
+graph = ADJACENCY_LIST
