@@ -1,16 +1,19 @@
 """Mumbai Junction Game - terminal interface.
 
-Run with:  python game.py
-Keep game.py, pathfinding.py and graphs.py in the SAME folder.
+Run with: python game.py <graph.json>
+Keep game.py and pathfinding.py together; the graph JSON can be elsewhere.
 """
 
-# STEP 1: Import your teammates' code (unchanged)
-# pathfinding.py already loads the graph, so we reuse its `graph`
-# and its `dijkstra`. This guarantees the game and the algorithm
-# always work on the exact same map.
+# ---------------------------------------------------------------
+# STEP 1: Import your shortest distance calculation code
+# ---------------------------------------------------------------
+import json
 import random
+import sys
 
-from pathfinding import dijkstra, graph
+from pathfinding import dijkstra, load_graph
+
+graph = {}
 
 
 # ---------------------------------------------------------------
@@ -55,26 +58,85 @@ def show_rules():
 def pick_random_stations():
     """Pick a random start and destination.
 
-    We keep picking until the two stations are different, a route exists,
-    and the best route has at least 2 hops (so it is never a one-step game).
+    The best route must have at least 2 hops (so it is never a one-step game).
     """
-    stations = list(graph.keys())
+    stations = list(graph)
+    journeys = []
+    for start in stations:
+        for goal in stations:
+            if start == goal:
+                continue
+            best_path, best_km = dijkstra(start, goal, graph)
+            if best_path is not None and len(best_path) >= 3:
+                journeys.append((start, goal, best_path, best_km))
+    return random.choice(journeys) if journeys else None
+
+
+def choose_station(prompt):
+    """Display all stations and return the selected one, or None to go back."""
+    stations = sorted(graph)
+    line()
+    for i, station in enumerate(stations, start=1):
+        print(f"  {i}. {pretty(station)}")
+    print("  0. Back to menu")
+
     while True:
-        start, goal = random.sample(stations, 2)
-        best_path, best_km = dijkstra(start, goal)
-        if best_path is not None and len(best_path) >= 3:
-            return start, goal, best_path, best_km
+        choice = input(prompt).strip()
+        if choice == "0":
+            return None
+        if choice.isdigit() and 1 <= int(choice) <= len(stations):
+            return stations[int(choice) - 1]
+        print("  Invalid choice. Pick a number from the list.")
+
+
+def pick_custom_stations():
+    """Let the player choose distinct stations connected by a route."""
+    while True:
+        start = choose_station("Choose your source station: ")
+        if start is None:
+            return None
+
+        goal = choose_station("Choose your destination station: ")
+        if goal is None:
+            return None
+        if start == goal:
+            print("  Source and destination must be different.")
+            continue
+
+        best_path, best_km = dijkstra(start, goal, graph)
+        if best_path is None:
+            print("  No route connects those stations. Please choose again.")
+            continue
+        return start, goal, best_path, best_km
 
 
 # ---------------------------------------------------------------
 # STEP 4: One full round of the game
 # ---------------------------------------------------------------
-def play_game():
+def play_game(journey=None):
     show_rules()
 
-    # The game picks the stations; the best route is computed now
-    # and kept hidden until the end.
-    start, goal, best_path, best_km = pick_random_stations()
+    # The best route is computed now and kept hidden until the end.
+    if journey is None:
+        journey = pick_random_stations()
+        if journey is None:
+            print("This graph has no route with at least two hops for a random game.")
+            return
+
+    while True:
+        play_round(journey)
+        while True:
+            replay = input("Play the same route again? (y/n): ").strip().lower()
+            if replay in ("y", "yes"):
+                break
+            if replay in ("n", "no"):
+                return
+            print("Please enter y or n.")
+
+
+def play_round(journey):
+    """Play one attempt, resetting the player's path and distance."""
+    start, goal, best_path, best_km = journey
     line()
     print(f"Your journey: {pretty(start)}  -->  {pretty(goal)}")
 
@@ -110,7 +172,7 @@ def play_game():
 
 # ---------------------------------------------------------------
 # STEP 5: Result screen
-# WIN RULE (change here if your team decides differently):
+# WIN RULE:
 #   the player wins if their total km equals the shortest km.
 # ---------------------------------------------------------------
 def show_result(player_path, player_km, best_path, best_km):
@@ -135,20 +197,38 @@ def show_result(player_path, player_km, best_path, best_km):
 # STEP 6: Main menu loop
 # ---------------------------------------------------------------
 def main():
+    if len(sys.argv) != 2:
+        print("Usage: python game.py <graph.json>", file=sys.stderr)
+        raise SystemExit(2)
+
+    graph_file = sys.argv[1]
+
+    global graph
+    try:
+        graph = load_graph(graph_file)
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        print(f"Could not load graph '{graph_file}': {error}", file=sys.stderr)
+        raise SystemExit(2)
+
     while True:
         line()
         print("   MUMBAI JUNCTION GAME")
         line()
-        print("1. Start the game")
-        print("2. Exit the game")
+        print("1. Start a game with random stations")
+        print("2. Choose source and destination stations")
+        print("3. Exit the game")
         choice = input("Enter your choice: ").strip()
         if choice == "1":
             play_game()
         elif choice == "2":
+            journey = pick_custom_stations()
+            if journey is not None:
+                play_game(journey)
+        elif choice == "3":
             print("Thanks for playing!")
             break
         else:
-            print("Invalid choice. Enter 1 or 2.")
+            print("Invalid choice. Enter 1, 2, or 3.")
 
 
 if __name__ == "__main__":
